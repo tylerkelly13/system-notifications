@@ -1,41 +1,45 @@
-# system-notifier
+= system-notifier
 
 A Rust-based Debian package
 
-## Building
+== Building
 
 Build the project:
 
-```bash
+[source,bash]
+----
 cargo build --release
-```
+----
 
-## Testing
+== Testing
 
 Run tests:
 
-```bash
+[source,bash]
+----
 cargo test
-```
+----
 
-## Building Debian Package
+== Building Debian Package
 
 Build the Debian package:
 
-```bash
+[source,bash]
+----
 dpkg-buildpackage -us -uc -b
-```
+----
 
 The generated `.deb` file will be in the parent directory.
 
-## Installing
+== Installing
 
 Install the package:
 
-```bash
+[source,bash]
+----
 sudo dpkg -i ../system-notifier_*.deb
-```
+----
 
-## License
+== License
 
 MIT
