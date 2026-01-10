@@ -1,0 +1,33 @@
+[report]
+# Output formats for coverage reports
+# Options: Html, Lcov, Json, Stdout, Xml, Coveralls
+out = ["Html", "Lcov"]
+
+# Directory to write coverage reports to
+output-dir = "coverage"
+
+[run]
+# Run tests with all features enabled
+all-features = true
+
+# Follow symbolic links when scanning for test files
+follow-symbolic-links = false
+
+# Timeout for test execution in seconds (default: 60)
+timeout = "120s"
+
+# Run doctests
+run-doctests = false
+
+[coverage]
+# Exclude files matching these patterns from coverage
+exclude-files = [
+    "*/tests/*",
+    "*/proptest-regressions/*",
+]
+
+# Count hits in coverage (not just whether a line was hit)
+count = true
+
+# Ignore panics in coverage
+ignore-panics = true

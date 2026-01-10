@@ -1,0 +1,36 @@
+# Rust
+/target/
+Cargo.lock
+**/*.rs.bk
+*.pdb
+
+# Coverage
+/coverage/
+
+# Debian packaging
+debian/.debhelper/
+debian/debhelper-build-stamp
+debian/files
+debian/*.log
+debian/*.substvars
+debian/tmp/
+debian/$PROJECT_NAME/
+
+# Build artifacts
+*.deb
+*.ddeb
+*.buildinfo
+*.changes
+*.dsc
+*.tar.*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
