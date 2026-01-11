@@ -1,0 +1,83 @@
+
+:toc:
+:toclevels: 2
+:project-name: System notifications service
+
+= {project-name} architecture
+
+== What this is
+
+A group of services for monitoring:
+
+* Battery levels
+* Disk space
+
+Users are notified by desktop notifications when thresholds are crossed.
+
+== Architecture overview
+
+=== Approach
+
+A monorepo of rust-based systemd services, for code sharing.
+
+=== Key components
+
+==== Battery monitor service
+Monitor battery levels and uses the notification library to alert users. It runs as a systemd service.
+
+==== Disk space monitor service
+Monitor disk space usage and uses the notification library to alert users. It runs as a systemd service.
+
+==== Notification library
+Shared library for sending desktop notifications. Used by both monitor services.
+
+=== How they connect
+The monitor services use the notification library to send alerts. Each service runs independently as a systemd service.
+
+== Technology choices
+
+|===
+|Area |Technology |Why
+
+|Frontend
+|System notifications
+|Little to no code needed, built-in support
+
+|Backend
+|Rust
+|Performance
+|===
+
+== Data
+
+=== Main entities
+None - no persistent data needed.
+
+=== Storage
+None - no persistent storage needed.
+
+== External integrations
+
+None - all functionality is local to the user's machine.
+
+== Important decisions
+
+//=== {Decision title}
+//* *What*:
+//* *Why*:
+//* *Tradeoff*:
+
+== AI agent notes
+
+=== Don't modify
+// Things that should stay stable (core abstractions, file formats, etc.).
+
+=== Extension points
+// Where new features should be added.
+
+=== Patterns to follow
+// Key patterns or approaches to use when extending the system.
+
+== Future ideas
+
+// Things you might add or change later.
