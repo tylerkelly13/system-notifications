@@ -1,0 +1,7 @@
+[Unit]
+Description=Checks the current battery level
+
+[Service]
+Type=oneshot
+CPUQuota=50%
+ExecStart=/usr/bin/battery-monitor

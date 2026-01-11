@@ -1,10 +1,45 @@
-= system-notifier
+= System Notifier
 
-A Rust-based Debian package
+A collection of system monitoring services that send desktop notifications for important system events.
+
+== What this is
+
+System Notifier provides monitoring services for:
+
+* Battery levels
+* Disk space usage
+
+Users receive desktop notifications when thresholds are crossed. Notifications remain on screen until dismissed.
+
+== Architecture
+
+This is a Rust-based monorepo containing multiple systemd services that share common notification code.
+
+=== Components
+
+==== Battery monitor service
+
+Monitors battery levels and sends notifications at three thresholds:
+
+* 15% - Low battery notice
+* 10% - Low battery warning
+* 5% - Critical battery warning (with shutdown advisory)
+
+==== Disk space monitor service
+
+Monitors disk space usage for configured paths (default: `/` and `/home`) and sends notifications at three thresholds:
+
+* 90% - Low disk space notice
+* 95% - Low disk space warning
+* 97.5% - Disk space critical
+
+==== Notification library
+
+Shared library for sending desktop notifications using the freedesktop notification system.
 
 == Building
 
-Build the project:
+Build the project in release mode:
 
 [source,bash]
 ----
@@ -13,14 +48,23 @@ cargo build --release
 
 == Testing
 
-Run tests:
+Run all tests including property-based tests:
 
 [source,bash]
 ----
 cargo test
 ----
 
-== Building Debian Package
+For test coverage analysis:
+
+[source,bash]
+----
+cargo tarpaulin
+----
+
+== Installation
+
+=== Building the Debian package
 
 Build the Debian package:
 
@@ -29,9 +73,9 @@ Build the Debian package:
 dpkg-buildpackage -us -uc -b
 ----
 
-The generated `.deb` file will be in the parent directory.
+The generated `.deb` file appears in the parent directory.
 
-== Installing
+=== Installing the package
 
 Install the package:
 
@@ -40,6 +84,170 @@ Install the package:
 sudo dpkg -i ../system-notifier_*.deb
 ----
 
+=== Enabling the services
+
+The timers are enabled automatically on installation. To manually control them:
+
+Enable and start battery monitor:
+
+[source,bash]
+----
+sudo systemctl enable --now battery-monitor.timer
+----
+
+Enable and start disk space monitor:
+
+[source,bash]
+----
+sudo systemctl enable --now diskspace-monitor.timer
+----
+
+=== Checking service status
+
+Check the status of the timers:
+
+[source,bash]
+----
+systemctl status battery-monitor.timer
+systemctl status diskspace-monitor.timer
+----
+
+View recent log entries:
+
+[source,bash]
+----
+journalctl -u battery-monitor.service
+journalctl -u diskspace-monitor.service
+----
+
+== Configuration
+
+=== Monitoring frequency
+
+Both services run every 5 minutes by default. To change this, edit the timer files in `/usr/lib/systemd/system/` and reload systemd:
+
+[source,bash]
+----
+sudo systemctl daemon-reload
+sudo systemctl restart battery-monitor.timer
+sudo systemctl restart diskspace-monitor.timer
+----
+
+=== Notification thresholds
+
+Thresholds are currently compile-time constants. To modify them:
+
+1. Edit the threshold constants in the source files:
+   - Battery: [battery.rs:9-11](src/battery.rs#L9-L11)
+   - Disk space: [diskspace.rs:10-12](src/diskspace.rs#L10-L12)
+
+2. Rebuild and reinstall the package.
+
+=== Monitored paths
+
+The disk space monitor checks `/` and `/home` by default. To modify this, edit [diskspace.rs:14](src/diskspace.rs#L14).
+
+== Development
+
+=== Project structure
+
+[source]
+----
+system-notifier/
+├── src/
+│   ├── lib.rs              # Library root
+│   ├── common.rs           # Shared notification code
+│   ├── battery.rs          # Battery monitoring logic
+│   ├── diskspace.rs        # Disk space monitoring logic
+│   └── bin/
+│       ├── battery-monitor.rs    # Battery service binary
+│       └── diskspace-monitor.rs  # Disk space service binary
+├── debian/
+│   ├── *.service           # Systemd service definitions
+│   └── *.timer             # Systemd timer definitions
+├── Cargo.toml              # Project dependencies
+└── README.adoc             # This file
+----
+
+=== Code style
+
+Follow the coding standards in [CLAUDE.md](CLAUDE.md):
+
+* Use Australian English spelling
+* Write clear, simple documentation
+* Provide comprehensive tests
+* Use `crate::` prefix for internal imports
+
+=== Running individual monitors
+
+For testing, run monitors directly:
+
+[source,bash]
+----
+cargo run --bin battery-monitor
+cargo run --bin diskspace-monitor
+----
+
+== Dependencies
+
+* Rust 2021 edition or later
+* notify-rust 4 (desktop notifications)
+* battery 0.7 (battery information)
+* sysinfo 0.32 (disk space information)
+* proptest 1.5 (property-based testing)
+
 == License
 
 MIT
+
+== Troubleshooting
+
+=== Notifications not appearing
+
+Check that the notification daemon is running:
+
+[source,bash]
+----
+ps aux | grep notification
+----
+
+Test notifications manually:
+
+[source,bash]
+----
+notify-send "Test" "This is a test notification"
+----
+
+=== Service not running
+
+Check service status:
+
+[source,bash]
+----
+systemctl status battery-monitor.timer
+systemctl status diskspace-monitor.timer
+----
+
+View service logs:
+
+[source,bash]
+----
+journalctl -xeu battery-monitor.service
+journalctl -xeu diskspace-monitor.service
+----
+
+=== Battery service fails on desktop systems
+
+The battery monitor gracefully handles systems without batteries. Check the logs to confirm:
+
+[source,bash]
+----
+journalctl -u battery-monitor.service
+----
+
+You may disable the battery monitor timer on desktop systems:
+
+[source,bash]
+----
+sudo systemctl disable --now battery-monitor.timer
+----

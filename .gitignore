@@ -6,6 +6,11 @@ Cargo.lock
 
 # Coverage
 /coverage/
+tarpaulin-report.html
+cobertura.xml
+
+# Property-based test regressions
+proptest-regressions/
 
 # Debian packaging
 debian/.debhelper/
@@ -30,6 +35,9 @@ debian/$PROJECT_NAME/
 *.swp
 *.swo
 *~
+
+# Flycheck (Emacs)
+flycheck_*.rs
 
 # OS
 .DS_Store

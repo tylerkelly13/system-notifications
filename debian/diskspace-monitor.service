@@ -1,0 +1,7 @@
+[Unit]
+Description=Checks the current disk space
+
+[Service]
+Type=oneshot
+CPUQuota=50%
+ExecStart=/usr/bin/diskspace-monitor
