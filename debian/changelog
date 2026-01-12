@@ -1,3 +1,14 @@
+system-notifier (0.2.0-1) unstable; urgency=medium
+
+  * Add battery monitoring service with threshold notifications
+  * Add diskspace monitoring service for configurable paths
+  * Add systemd service and timer units for both monitors
+  * Add shared notification library using freedesktop notification system
+  * Add comprehensive project documentation in AsciiDoc format
+  * Add architecture documentation
+
+ -- Tyler Kelly <tyler.kelly@outlook.com>  Mon, 12 Jan 2026 10:26:02 +0000
+
 system-notifier (0.1.0-1) unstable; urgency=medium
 
   * Initial release
