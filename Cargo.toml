@@ -39,7 +39,5 @@ assets = [
 ]
 systemd-units = [
     { unit-name = "battery-monitor", enable = false },
-    { unit-name = "battery-monitor.timer", enable = true },
     { unit-name = "diskspace-monitor", enable = false },
-    { unit-name = "diskspace-monitor.timer", enable = true },
 ]
