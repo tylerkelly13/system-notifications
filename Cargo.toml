@@ -2,6 +2,11 @@
 name = "system-notifier"
 version = "0.1.0"
 edition = "2021"
+description = "System monitoring services that send desktop notifications for battery and disk space events"
+authors = ["Tyler Kelly <tyler.kelly@outlook.com>"]
+license = "MIT"
+repository = "https://github.com/tylerkelly/system-notifier"
+readme = "README.adoc"
 
 [dependencies]
 notify-rust = "4"
@@ -31,8 +36,6 @@ assets = [
     ["target/release/battery-monitor", "usr/bin/", "755"],
     ["target/release/diskspace-monitor", "usr/bin/", "755"],
     ["README.adoc", "usr/share/doc/system-notifier/README.adoc", "644"],
-    ["debian/*.service", "usr/lib/systemd/system/", "644"],
-    ["debian/*.timer", "usr/lib/systemd/system/", "644"],
 ]
 systemd-units = [
     { unit-name = "battery-monitor", enable = false },
