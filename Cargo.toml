@@ -38,6 +38,6 @@ assets = [
     ["README.adoc", "usr/share/doc/system-notifier/README.adoc", "644"],
 ]
 systemd-units = [
-    { unit-name = "battery-monitor", enable = false },
-    { unit-name = "diskspace-monitor", enable = false },
+    { unit-name = "battery-monitor", enable = true },
+    { unit-name = "diskspace-monitor", enable = true },
 ]
