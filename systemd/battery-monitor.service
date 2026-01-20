@@ -5,3 +5,6 @@ Description=Checks the current battery level
 Type=oneshot
 CPUQuota=50%
 ExecStart=/usr/bin/battery-monitor
+
+[Install]
+WantedBy=default.target

@@ -1,9 +1,6 @@
 [Unit]
 Description=Checks the current disk space (timer)
 
-Requires=graphical.target multi-user.target
-After=graphical.target multi-user.target
-
 [Timer]
 OnCalendar=*-*-* *:00,05,10,15,20,25,30,35,40,45,50,55:00
 OnStartupSec=1min
@@ -11,4 +8,4 @@ RandomizedDelaySec=2min
 Persistent=true
 
 [Install]
-WantedBy=timers.target diskspace-monitor.service
+WantedBy=timers.target
