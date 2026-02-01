@@ -1,25 +1,8 @@
 #!/bin/sh
 set -e
 
-# Stop and disable user systemd services for all users
-# This runs during package removal
-
-if [ "$1" = "remove" ] || [ "$1" = "deconfigure" ]; then
-    # Stop and disable services for each logged-in user
-    for user_id in $(loginctl list-users --no-legend | awk '{print $1}'); do
-        if [ -n "$user_id" ]; then
-            # Get the username from the UID
-            user_name=$(id -nu "$user_id" 2>/dev/null || true)
-            if [ -n "$user_name" ]; then
-                # Run systemctl commands as the user
-                su - "$user_name" -c "systemctl --user stop battery-monitor.timer" 2>/dev/null || true
-                su - "$user_name" -c "systemctl --user stop diskspace-monitor.timer" 2>/dev/null || true
-                su - "$user_name" -c "systemctl --user disable battery-monitor.timer" 2>/dev/null || true
-                su - "$user_name" -c "systemctl --user disable diskspace-monitor.timer" 2>/dev/null || true
-            fi
-        fi
-    done
-fi
+# No system units to stop. User timers stop when users log out
+# or when the unit files are removed.
 
 #DEBHELPER#
 

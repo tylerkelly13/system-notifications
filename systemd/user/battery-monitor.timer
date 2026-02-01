@@ -1,5 +1,6 @@
 [Unit]
-Description=Checks the current disk space (timer)
+Description=Checks the current battery level (timer)
+Documentation=https://github.com/tylerkelly13/system-notifications
 
 [Timer]
 OnCalendar=*-*-* *:00,05,10,15,20,25,30,35,40,45,50,55:00

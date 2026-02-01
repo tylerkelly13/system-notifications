@@ -1,10 +1,8 @@
 [Unit]
 Description=Checks the current battery level
+Documentation=https://github.com/tylerkelly13/system-notifications
 
 [Service]
 Type=oneshot
-CPUQuota=50%
+CPUQuota=25%
 ExecStart=/usr/bin/battery-monitor
-
-[Install]
-WantedBy=default.target

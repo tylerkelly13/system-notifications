@@ -1,0 +1,15 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = "purge" ]; then
+    # Disable user timers globally
+    systemctl --global disable battery-monitor.timer || true
+    systemctl --global disable diskspace-monitor.timer || true
+
+    # Reload systemd daemon
+    systemctl daemon-reload || true
+fi
+
+#DEBHELPER#
+
+exit 0
