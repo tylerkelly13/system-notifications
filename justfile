@@ -39,7 +39,7 @@ build:
 
 # Build Debian package
 build-deb:
-    dpkg-buildpackage -us -uc -b
+    cargo deb
 
 # Install binary locally to ~/.cargo/bin
 install:

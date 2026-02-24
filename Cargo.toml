@@ -37,8 +37,8 @@ assets = [
     ["target/release/battery-monitor", "usr/bin/", "755"],
     ["target/release/diskspace-monitor", "usr/bin/", "755"],
     ["README.adoc", "usr/share/doc/system-notifier/README.adoc", "644"],
-    ["systemd/battery-monitor.service", "usr/lib/systemd/user/", "644"],
-    ["systemd/battery-monitor.timer", "usr/lib/systemd/user/", "644"],
-    ["systemd/diskspace-monitor.service", "usr/lib/systemd/user/", "644"],
-    ["systemd/diskspace-monitor.timer", "usr/lib/systemd/user/", "644"],
+    ["systemd/user/battery-monitor.service", "usr/lib/systemd/user/", "644"],
+    ["systemd/user/battery-monitor.timer", "usr/lib/systemd/user/", "644"],
+    ["systemd/user/diskspace-monitor.service", "usr/lib/systemd/user/", "644"],
+    ["systemd/user/diskspace-monitor.timer", "usr/lib/systemd/user/", "644"],
 ]
