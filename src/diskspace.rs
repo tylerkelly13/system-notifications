@@ -3,13 +3,9 @@
 //! Monitors disk space usage and sends notifications when thresholds are crossed.
 
 use crate::common::{notify, App, NotificationType};
-use sysinfo::Disks;
+use crate::config::DiskConfig;
 use std::path::Path;
-
-/// Disk usage threshold levels (percentage)
-const THRESHOLD_LOW: f64 = 90.0;
-const THRESHOLD_VERY_LOW: f64 = 95.0;
-const THRESHOLD_CRITICAL: f64 = 97.5;
+use sysinfo::Disks;
 
 /// Default paths to monitor
 pub const DEFAULT_PATHS: &[&str] = &["/", "/home"];
@@ -26,7 +22,7 @@ pub struct DiskSpaceInfo {
     /// Available space in bytes
     pub available_bytes: u64,
     /// Percentage used (0.0 to 100.0)
-    pub percent_used: f64,
+    pub percent_used: f32,
 }
 
 /// Converts bytes to human-readable format.
@@ -63,7 +59,7 @@ pub fn bytes_to_human(bytes: u64) -> String {
 
     for (i, unit) in UNITS.iter().enumerate().rev() {
         if bytes >= *unit {
-            let value = bytes as f64 / *unit as f64;
+            let value = bytes as f32 / *unit as f32;
             return format!("{:.1}{}", value, SYMBOLS[i]);
         }
     }
@@ -87,16 +83,16 @@ pub fn get_disk_space_info(path: &str) -> Option<DiskSpaceInfo> {
     let path_obj = Path::new(path);
 
     // Find the disk that contains this path
-    let disk = disks.iter().find(|d| {
-        path_obj.starts_with(d.mount_point())
-    })?;
+    let disk = disks
+        .iter()
+        .find(|d| path_obj.starts_with(d.mount_point()))?;
 
     let total_bytes = disk.total_space();
     let available_bytes = disk.available_space();
     let used_bytes = total_bytes.saturating_sub(available_bytes);
 
     let percent_used = if total_bytes > 0 {
-        (used_bytes as f64 / total_bytes as f64) * 100.0
+        (used_bytes as f32 / total_bytes as f32) * 100.0
     } else {
         0.0
     };
@@ -129,70 +125,76 @@ pub fn format_diskspace_message(info: &DiskSpaceInfo) -> String {
     )
 }
 
-/// Determines which notification should be sent based on disk usage.
-///
-/// # Arguments
-///
-/// * `info` - The disk space information
-///
-/// # Returns
-///
-/// * `Some((title, message, notification_type))` if a notification should be sent
-/// * `None` if disk space is acceptable
-pub fn determine_notification(info: &DiskSpaceInfo) -> Option<(String, String, NotificationType)> {
+/// Determines which notification should be sent based on disk usage and explicit thresholds.
+fn determine_notification_with_thresholds(
+    info: &DiskSpaceInfo,
+    low: f32,
+    very_low: f32,
+    critical: f32,
+) -> Option<(String, String, NotificationType)> {
     let percent = info.percent_used;
     let message = format_diskspace_message(info);
 
-    if percent >= THRESHOLD_CRITICAL {
-        Some((
-            "Disk space critical".to_string(),
-            message,
-            NotificationType::Error,
-        ))
-    } else if percent >= THRESHOLD_VERY_LOW {
-        Some((
-            "Low disk space warning".to_string(),
-            message,
-            NotificationType::Info,
-        ))
-    } else if percent >= THRESHOLD_LOW {
-        Some((
-            "Low disk space notice".to_string(),
-            message,
-            NotificationType::Info,
-        ))
+    if percent >= critical {
+        Some(("Disk space critical".to_string(), message, NotificationType::Error))
+    } else if percent >= very_low {
+        Some(("Low disk space warning".to_string(), message, NotificationType::Info))
+    } else if percent >= low {
+        Some(("Low disk space notice".to_string(), message, NotificationType::Info))
     } else {
         None
     }
 }
 
-/// Checks disk space for specified paths and sends notifications if needed.
+/// Checks disk space and sends notifications if needed.
 ///
-/// # Arguments
-///
-/// * `paths` - Slice of filesystem paths to monitor
-///
-/// This is the main entry point for the disk space monitoring service.
-pub fn check_and_notify(paths: &[&str]) {
+/// Paths and thresholds are read from `config`. If `config.disabled` is `true`,
+/// returns immediately without checking.
+pub fn check_and_notify(config: &DiskConfig) {
+    if config.disabled.unwrap_or(false) {
+        return;
+    }
+
+    // After Config::load() deep-merges with defaults, all fields are
+    // guaranteed to be Some. Panicking here would indicate a programming
+    // error (check_and_notify called without a merged config).
+    let paths = config.paths.as_deref().unwrap();
+    let t = config.thresholds.as_ref().unwrap();
+    let low      = t.low.unwrap();
+    let very_low = t.very_low.unwrap();
+    let critical = t.critical.unwrap();
+
     for path in paths {
         if let Some(info) = get_disk_space_info(path) {
-            if let Some((title, message, notification_type)) = determine_notification(&info) {
+            if let Some((title, message, notification_type)) =
+                determine_notification_with_thresholds(&info, low, very_low, critical)
+            {
                 notify(notification_type, App::DiskSpace, &title, &message);
             }
         }
     }
 }
 
-/// Checks disk space for default paths and sends notifications if needed.
-///
-/// Monitors "/" and "/home" by default.
-pub fn check_and_notify_defaults() {
-    check_and_notify(DEFAULT_PATHS);
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // Shorthand: call the internal helper with the configured default thresholds (90/95/97.5).
+    fn notify_default(info: &DiskSpaceInfo) -> Option<(String, String, NotificationType)> {
+        determine_notification_with_thresholds(info, 90.0, 95.0, 97.5)
+    }
+
+    fn disk_info(percent_used: f32) -> DiskSpaceInfo {
+        let total = 100_000_000_000u64;
+        let used = (total as f32 * percent_used / 100.0) as u64;
+        DiskSpaceInfo {
+            path: "/".to_string(),
+            total_bytes: total,
+            used_bytes: used,
+            available_bytes: total.saturating_sub(used),
+            percent_used,
+        }
+    }
 
     #[test]
     fn test_bytes_to_human_zero() {
@@ -228,15 +230,7 @@ mod tests {
 
     #[test]
     fn test_format_diskspace_message() {
-        let info = DiskSpaceInfo {
-            path: "/".to_string(),
-            total_bytes: 100000000000,
-            used_bytes: 90000000000,
-            available_bytes: 10000000000,
-            percent_used: 90.0,
-        };
-
-        let msg = format_diskspace_message(&info);
+        let msg = format_diskspace_message(&disk_info(90.0));
         assert!(msg.contains("/"));
         assert!(msg.contains("90.0%"));
         assert!(msg.contains("full"));
@@ -244,30 +238,12 @@ mod tests {
 
     #[test]
     fn test_determine_notification_ok() {
-        let info = DiskSpaceInfo {
-            path: "/".to_string(),
-            total_bytes: 100000000000,
-            used_bytes: 50000000000,
-            available_bytes: 50000000000,
-            percent_used: 50.0,
-        };
-
-        assert_eq!(determine_notification(&info), None);
+        assert_eq!(notify_default(&disk_info(50.0)), None);
     }
 
     #[test]
     fn test_determine_notification_low() {
-        let info = DiskSpaceInfo {
-            path: "/".to_string(),
-            total_bytes: 100000000000,
-            used_bytes: 91000000000,
-            available_bytes: 9000000000,
-            percent_used: 91.0,
-        };
-
-        let result = determine_notification(&info);
-        assert!(result.is_some());
-        let (title, message, notif_type) = result.unwrap();
+        let (title, message, notif_type) = notify_default(&disk_info(91.0)).unwrap();
         assert_eq!(title, "Low disk space notice");
         assert!(message.contains("91.0%"));
         assert_eq!(notif_type, NotificationType::Info);
@@ -275,17 +251,7 @@ mod tests {
 
     #[test]
     fn test_determine_notification_very_low() {
-        let info = DiskSpaceInfo {
-            path: "/home".to_string(),
-            total_bytes: 100000000000,
-            used_bytes: 96000000000,
-            available_bytes: 4000000000,
-            percent_used: 96.0,
-        };
-
-        let result = determine_notification(&info);
-        assert!(result.is_some());
-        let (title, message, notif_type) = result.unwrap();
+        let (title, message, notif_type) = notify_default(&disk_info(96.0)).unwrap();
         assert_eq!(title, "Low disk space warning");
         assert!(message.contains("96.0%"));
         assert_eq!(notif_type, NotificationType::Info);
@@ -293,17 +259,7 @@ mod tests {
 
     #[test]
     fn test_determine_notification_critical() {
-        let info = DiskSpaceInfo {
-            path: "/".to_string(),
-            total_bytes: 100000000000,
-            used_bytes: 98000000000,
-            available_bytes: 2000000000,
-            percent_used: 98.0,
-        };
-
-        let result = determine_notification(&info);
-        assert!(result.is_some());
-        let (title, message, notif_type) = result.unwrap();
+        let (title, message, notif_type) = notify_default(&disk_info(98.0)).unwrap();
         assert_eq!(title, "Disk space critical");
         assert!(message.contains("98.0%"));
         assert_eq!(notif_type, NotificationType::Error);
@@ -311,52 +267,25 @@ mod tests {
 
     #[test]
     fn test_determine_notification_at_thresholds() {
-        // Test exact threshold values
-        let info_low = DiskSpaceInfo {
-            path: "/".to_string(),
-            total_bytes: 100000000000,
-            used_bytes: 90000000000,
-            available_bytes: 10000000000,
-            percent_used: 90.0,
-        };
-        assert!(determine_notification(&info_low).is_some());
+        assert!(notify_default(&disk_info(90.0)).is_some());
+        assert!(notify_default(&disk_info(95.0)).is_some());
+        assert!(notify_default(&disk_info(97.5)).is_some());
+    }
 
-        let info_very_low = DiskSpaceInfo {
-            path: "/".to_string(),
-            total_bytes: 100000000000,
-            used_bytes: 95000000000,
-            available_bytes: 5000000000,
-            percent_used: 95.0,
-        };
-        assert!(determine_notification(&info_very_low).is_some());
-
-        let info_critical = DiskSpaceInfo {
-            path: "/".to_string(),
-            total_bytes: 100000000000,
-            used_bytes: 97500000000,
-            available_bytes: 2500000000,
-            percent_used: 97.5,
-        };
-        assert!(determine_notification(&info_critical).is_some());
+    #[test]
+    fn test_determine_notification_custom_thresholds() {
+        // With defaults, 88% triggers nothing.
+        assert_eq!(notify_default(&disk_info(88.0)), None);
+        // With a user-lowered low threshold of 85%, 88% triggers a notice.
+        let result = determine_notification_with_thresholds(&disk_info(88.0), 85.0, 92.0, 96.0);
+        assert!(result.is_some());
+        let (title, _, _) = result.unwrap();
+        assert_eq!(title, "Low disk space notice");
     }
 
     #[test]
     fn test_diskspace_info_equality() {
-        let info1 = DiskSpaceInfo {
-            path: "/".to_string(),
-            total_bytes: 100000000000,
-            used_bytes: 50000000000,
-            available_bytes: 50000000000,
-            percent_used: 50.0,
-        };
-        let info2 = DiskSpaceInfo {
-            path: "/".to_string(),
-            total_bytes: 100000000000,
-            used_bytes: 50000000000,
-            available_bytes: 50000000000,
-            percent_used: 50.0,
-        };
-        assert_eq!(info1, info2);
+        assert_eq!(disk_info(50.0), disk_info(50.0));
     }
 
     #[test]
@@ -380,7 +309,6 @@ mod proptests {
         #[test]
         fn test_bytes_to_human_always_has_unit(bytes in 1u64..1_000_000_000_000) {
             let result = bytes_to_human(bytes);
-            // Should end with a unit letter or B
             let last_char = result.chars().last().unwrap();
             assert!(last_char.is_alphabetic());
         }
@@ -388,11 +316,10 @@ mod proptests {
         #[test]
         fn test_format_diskspace_message_never_panics(
             total in 1u64..1_000_000_000_000,
-            used_percent in 0.0f64..100.0
+            used_percent in 0.0f32..100.0
         ) {
-            let used = ((total as f64 * used_percent) / 100.0) as u64;
+            let used = ((total as f32 * used_percent) / 100.0) as u64;
             let available = total.saturating_sub(used);
-
             let info = DiskSpaceInfo {
                 path: "/test".to_string(),
                 total_bytes: total,
@@ -400,7 +327,6 @@ mod proptests {
                 available_bytes: available,
                 percent_used: used_percent,
             };
-
             let result = format_diskspace_message(&info);
             assert!(!result.is_empty());
             assert!(result.contains('%'));
@@ -409,11 +335,10 @@ mod proptests {
         #[test]
         fn test_determine_notification_consistent(
             total in 1u64..1_000_000_000_000,
-            percent in 0.0f64..100.0
+            percent in 0.0f32..100.0
         ) {
-            let used = ((total as f64 * percent) / 100.0) as u64;
+            let used = ((total as f32 * percent) / 100.0) as u64;
             let available = total.saturating_sub(used);
-
             let info = DiskSpaceInfo {
                 path: "/test".to_string(),
                 total_bytes: total,
@@ -421,10 +346,7 @@ mod proptests {
                 available_bytes: available,
                 percent_used: percent,
             };
-
-            let result = determine_notification(&info);
-
-            // Verify notification logic
+            let result = determine_notification_with_thresholds(&info, 90.0, 95.0, 97.5);
             if percent >= 97.5 {
                 assert!(result.is_some());
                 if let Some((_, _, notif_type)) = result {

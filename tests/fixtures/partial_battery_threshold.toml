@@ -1,0 +1,4 @@
+# User overrides only the low battery threshold.
+# very_low and critical should be filled in from defaults (10% and 5%).
+[battery.thresholds]
+low = 25.0

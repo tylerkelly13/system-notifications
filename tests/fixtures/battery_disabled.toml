@@ -1,0 +1,4 @@
+# User disables battery monitoring entirely.
+# All threshold values should still be filled in from defaults after merge.
+[battery]
+disabled = true

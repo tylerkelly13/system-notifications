@@ -1,83 +1,202 @@
-
 :toc:
-:toclevels: 2
+:toclevels: 3
 :project-name: System notifications service
 
 = {project-name} architecture
 
 == What this is
 
-A group of services for monitoring:
+A group of Rust-based systemd user services for monitoring:
 
 * Battery levels
-* Disk space
+* Disk space usage
 
-Users are notified by desktop notifications when thresholds are crossed.
+Users receive desktop notifications when thresholds are crossed.
 
 == Architecture overview
 
 === Approach
 
-A monorepo of rust-based systemd services, for code sharing.
+A Rust monorepo of systemd user services.
+Each monitor is a separate binary that runs on a timer, checks one thing, sends a notification if needed, and exits.
+All monitors share a common notification library and a common config loader.
 
 === Key components
 
-==== Battery monitor service
-Monitor battery levels and uses the notification library to alert users. It runs as a systemd service.
+==== Battery monitor (`src/bin/battery-monitor.rs`)
+Loads user config, then calls the battery library to check the current level and send a notification if any threshold is crossed.
 
-==== Disk space monitor service
-Monitor disk space usage and uses the notification library to alert users. It runs as a systemd service.
+==== Disk space monitor (`src/bin/diskspace-monitor.rs`)
+Loads user config, then calls the disk space library to check each configured path and send a notification if any threshold is crossed.
 
-==== Notification library
-Shared library for sending desktop notifications. Used by both monitor services.
+==== Battery library (`src/battery.rs`)
+Contains the monitoring logic: reads system battery state, decides which notification level applies, and sends the alert. The public API is `check_and_notify(config: &BatteryConfig)`.
+
+==== Disk space library (`src/diskspace.rs`)
+Contains the monitoring logic: reads disk usage for each configured path, decides which notification level applies, and sends the alert. The public API is `check_and_notify(config: &DiskConfig)`.
+
+==== Notification library (`src/common.rs`)
+Shared types (`App`, `NotificationType`) and functions (`notify`, `notify_error`) that wrap `notify-rust` to send freedesktop desktop notifications.
+
+==== Config system (`src/config.rs`)
+Loads user TOML config and deep-merges it with built-in defaults so every field is always populated.
+See <<config-system>> for full details.
 
 === How they connect
-The monitor services use the notification library to send alerts. Each service runs independently as a systemd service.
+
+[source]
+----
+binary (battery-monitor / diskspace-monitor)
+  └─ Config::load()               # config.rs  — find file, parse, deep-merge
+       └─ check_and_notify()      # battery.rs / diskspace.rs  — check + alert
+            └─ notify()           # common.rs  — send desktop notification
+----
 
 == Technology choices
 
 |===
 |Area |Technology |Why
 
-|Frontend
-|System notifications
-|Little to no code needed, built-in support
+|Runtime
+|Rust 2021
+|Memory safety, small binaries, no runtime overhead
 
-|Backend
-|Rust
-|Performance
+|Notifications
+|notify-rust 4 / freedesktop D-Bus
+|Standard Linux desktop notification protocol, zero user-visible setup
+
+|System info
+|battery 0.7, sysinfo 0.32
+|Crates with clean APIs for reading battery and disk state
+
+|Config
+|toml 1, serde 1
+|Widely used, human-editable format; serde derive minimises boilerplate
+
+|Config merging
+|merge 0.2
+|Allows partial user configs — only the fields present override defaults
+
+|Service scheduling
+|systemd user timers
+|No daemon process; the binary runs, checks, exits
+
+|Testing
+|proptest 1.5
+|Property-based tests catch edge cases the unit tests miss
 |===
 
 == Data
 
 === Main entities
-None - no persistent data needed.
+
+* `BatteryInfo` — current charge, plugged-in state, time remaining
+* `DiskSpaceInfo` — path, total/used/available bytes, percent used
+* `Config` / `BatteryConfig` / `DiskConfig` — runtime configuration
 
 === Storage
-None - no persistent storage needed.
+
+None. No persistent state. Each timer invocation is independent.
+
+[[config-system]]
+== Config system
+
+=== File search order
+
+`Config::load()` checks these paths in order and uses the first one found:
+
+. `~/.config/system-monitor.toml`
+. `~/.config/system-monitor/config.toml`
+. `~/.system-monitor.toml`
+
+If no file is found, built-in defaults apply.
+
+=== Deep merge
+
+The `merge` crate fills in any missing fields from `Config::default()` after parsing.
+Merging operates at every nesting level, so a user can override a single threshold value without specifying the rest.
+
+Example: a user config containing only `[battery.thresholds] low = 20.0` produces a fully populated config where `very_low` and `critical` come from the defaults.
+
+The strategy is `overwrite_none` at every level:
+
+[source]
+----
+Config
+  battery: Option<BatteryConfig>     ← merge_option_deep
+    thresholds: Option<BatteryThreshold>  ← merge_option_deep
+      low:      Option<f32>          ← overwrite_none
+      very_low: Option<f32>          ← overwrite_none
+      critical: Option<f32>          ← overwrite_none
+    disabled: Option<bool>           ← overwrite_none
+  diskspace: Option<DiskConfig>      ← merge_option_deep
+    paths: Option<Vec<String>>       ← overwrite_none
+    thresholds: Option<DiskThreshold>    ← merge_option_deep
+      low / very_low / critical      ← overwrite_none
+    disabled: Option<bool>           ← overwrite_none
+----
+
+=== Error handling
+
+If a config file exists but cannot be parsed, the binary:
+
+. Prints the error to stderr (visible in `journalctl --user`)
+. Sends a desktop notification telling the user to check the config and the service logs
+. Exits without checking the system
+
+=== Source of truth for defaults
+
+All default values live in `Config::default()` in `src/config.rs`.
+The monitor libraries (`battery.rs`, `diskspace.rs`) contain no hardcoded threshold values — they receive a fully-merged config and call `.unwrap()` on every field knowing the merge guarantees they are populated.
 
 == External integrations
 
-None - all functionality is local to the user's machine.
+None. All functionality is local to the user's machine.
 
 == Important decisions
 
-//=== {Decision title}
-//* *What*:
-//* *Why*:
-//* *Tradeoff*:
+=== Deep merge instead of flat Option replacement
+
+* *What*: `Config`, `BatteryConfig`, `DiskConfig`, `BatteryThreshold`, and `DiskThreshold` all implement `Merge`. A custom `merge_option_deep` helper recurses into `Option<T>` when both sides are `Some`, rather than replacing the whole sub-tree.
+* *Why*: A user who only wants to change one threshold should not have to copy the entire config structure. Flat replacement would silently reset all unspecified fields to `None`.
+* *Tradeoff*: More `Merge` derives and a small helper function in `config.rs`. Worth it for the user experience.
+
+=== Single source of truth for defaults
+
+* *What*: All default threshold values are defined once in `Config::default()`. The monitor libraries have no threshold constants of their own.
+* *Why*: Duplicate constants in `battery.rs` and `diskspace.rs` drifted from `Config::default()` values and created confusion about which values were authoritative.
+* *Tradeoff*: Calling `Config::default()` at startup has a trivial cost. The clarity benefit outweighs it.
+
+=== `disabled` flag instead of timer manipulation
+
+* *What*: Each monitor section has a `disabled` option. When `true`, the binary exits immediately after loading config.
+* *Why*: Disabling a systemd timer requires `systemctl --user` commands and survives package reinstalls imperfectly. A config flag is simpler and survives reinstalls cleanly.
+* *Tradeoff*: The timer still fires on schedule; it just does nothing. Acceptable given the binary is cheap to start.
 
 == AI agent notes
 
 === Don't modify
-// Things that should stay stable (core abstractions, file formats, etc.).
+
+* `Config::default()` is the single source of truth for all default threshold values. Do not add threshold constants elsewhere.
+* `merge_option_deep` in `config.rs` is intentional — do not replace it with `merge::option::overwrite_none` at the `Config` level or partial user configs will break.
+* The `check_and_notify` functions call `.unwrap()` on config fields without fallbacks. This is safe because they receive a fully-merged config from `Config::load()`. Do not add fallback values here.
 
 === Extension points
-// Where new features should be added.
+
+* *New monitor*: add a `src/<name>.rs` library, a `src/bin/<name>-monitor.rs` binary, a config struct pair in `src/config.rs`, systemd service and timer files in `systemd/user/`, and entries in `Cargo.toml`.
+* *New threshold level*: add the field to the relevant `*Threshold` struct in `config.rs` (with `Merge` strategy), add it to `Config::default()`, and update the notification logic in the monitor library.
+* *New notification type*: add a variant to `NotificationType` and `App` in `src/common.rs` and handle it in `get_icon`, `get_urgency`, and `get_appname`.
 
 === Patterns to follow
-// Key patterns or approaches to use when extending the system.
+
+* Config structs use `Option<T>` for every field so partial TOML files parse cleanly.
+* After `Config::load()`, all fields are `Some`. Call `.unwrap()` directly in monitor logic — no `unwrap_or` fallbacks.
+* Tests for notification logic use the private `determine_notification_with_thresholds` helper directly with explicit threshold values, not a public wrapper. This keeps threshold values visible in the test.
+* Fixture TOML files in `tests/fixtures/` cover config loading and merge scenarios.
 
 == Future ideas
 
-// Things you might add or change later.
+* Network connectivity monitor
+* CPU / memory pressure monitor
+* `once_cell` / `LazyLock` for `Config::default()` if startup cost becomes measurable
+* Config file watcher (reload without restarting the timer)

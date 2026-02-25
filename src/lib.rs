@@ -5,4 +5,5 @@
 
 pub mod battery;
 pub mod common;
+pub mod config;
 pub mod diskspace;

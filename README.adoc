@@ -13,13 +13,13 @@ Users receive desktop notifications when thresholds are crossed. Notifications r
 
 == Architecture
 
-This is a Rust-based monorepo containing multiple systemd services that share common notification code.
+This is a Rust-based monorepo containing multiple systemd user services that share common notification code.
 
 === Components
 
 ==== Battery monitor service
 
-Monitors battery levels and sends notifications at three thresholds:
+Monitors battery levels and sends notifications at three thresholds (defaults):
 
 * 15% - Low battery notice
 * 10% - Low battery warning
@@ -27,7 +27,7 @@ Monitors battery levels and sends notifications at three thresholds:
 
 ==== Disk space monitor service
 
-Monitors disk space usage for configured paths (default: `/` and `/home`) and sends notifications at three thresholds:
+Monitors disk space usage for configured paths and sends notifications at three thresholds (defaults):
 
 * 90% - Low disk space notice
 * 95% - Low disk space warning
@@ -36,6 +36,16 @@ Monitors disk space usage for configured paths (default: `/` and `/home`) and se
 ==== Notification library
 
 Shared library for sending desktop notifications using the freedesktop notification system.
+
+==== Config system
+
+Both monitors load user configuration from the first file found at these paths (in order):
+
+. `~/.config/system-monitor.toml`
+. `~/.config/system-monitor/config.toml`
+. `~/.system-monitor.toml`
+
+Any values not specified in the config file are filled in from built-in defaults.
 
 == Building
 
@@ -92,14 +102,14 @@ Enable and start battery monitor:
 
 [source,bash]
 ----
-sudo systemctl enable --now battery-monitor.timer
+systemctl --user enable --now battery-monitor.timer
 ----
 
 Enable and start disk space monitor:
 
 [source,bash]
 ----
-sudo systemctl enable --now diskspace-monitor.timer
+systemctl --user enable --now diskspace-monitor.timer
 ----
 
 === Checking service status
@@ -108,44 +118,81 @@ Check the status of the timers:
 
 [source,bash]
 ----
-systemctl status battery-monitor.timer
-systemctl status diskspace-monitor.timer
+systemctl --user status battery-monitor.timer
+systemctl --user status diskspace-monitor.timer
 ----
 
 View recent log entries:
 
 [source,bash]
 ----
-journalctl -u battery-monitor.service
-journalctl -u diskspace-monitor.service
+journalctl --user -u battery-monitor.service
+journalctl --user -u diskspace-monitor.service
 ----
 
 == Configuration
 
+Both monitors are configured through a TOML file. The first file found at these locations is used:
+
+. `~/.config/system-monitor.toml`
+. `~/.config/system-monitor/config.toml`
+. `~/.system-monitor.toml`
+
+Any option not present in the file falls back to the built-in default. The file does not need to be complete.
+
+=== Example configuration
+
+[source,toml]
+----
+[battery]
+disabled = false
+
+[battery.thresholds]
+low = 20.0        # default: 15.0
+very_low = 12.0   # default: 10.0
+critical = 7.0    # default: 5.0
+
+[diskspace]
+paths = ["/", "/home", "/data"]
+
+[diskspace.thresholds]
+low = 85.0        # default: 90.0
+very_low = 92.0   # default: 95.0
+critical = 96.0   # default: 97.5
+----
+
+=== Disabling a monitor
+
+NOTE:: This does not disable the systemd timer, so the service will still run at the configured interval but exit immediately without performing any checks.
+
+Set `disabled = true` in the relevant section to skip all checks for that monitor without disabling the systemd timer:
+
+[source,toml]
+----
+[battery]
+disabled = true
+----
+
 === Monitoring frequency
 
-Both services run every 5 minutes by default. To change this, edit the timer files in `/usr/lib/systemd/system/` and reload systemd:
+Both services run every 5 minutes by default. To change this, edit the timer files in `/usr/lib/systemd/user/` and reload systemd:
 
 [source,bash]
 ----
-sudo systemctl daemon-reload
-sudo systemctl restart battery-monitor.timer
-sudo systemctl restart diskspace-monitor.timer
+systemctl --user daemon-reload
+systemctl --user restart battery-monitor.timer
+systemctl --user restart diskspace-monitor.timer
 ----
-
-=== Notification thresholds
-
-Thresholds are currently compile-time constants. To modify them:
-
-1. Edit the threshold constants in the source files:
-   - Battery: [battery.rs:9-11](src/battery.rs#L9-L11)
-   - Disk space: [diskspace.rs:10-12](src/diskspace.rs#L10-L12)
-
-2. Rebuild and reinstall the package.
 
 === Monitored paths
 
-The disk space monitor checks `/` and `/home` by default. To modify this, edit [diskspace.rs:14](src/diskspace.rs#L14).
+The disk space monitor checks `/` by default. Override this with the `paths` key:
+
+[source,toml]
+----
+[diskspace]
+paths = ["/", "/home"]
+----
 
 == Development
 
@@ -157,25 +204,26 @@ system-notifier/
 ├── src/
 │   ├── lib.rs              # Library root
 │   ├── common.rs           # Shared notification code
+│   ├── config.rs           # TOML config loading and deep merge
 │   ├── battery.rs          # Battery monitoring logic
 │   ├── diskspace.rs        # Disk space monitoring logic
 │   └── bin/
 │       ├── battery-monitor.rs    # Battery service binary
 │       └── diskspace-monitor.rs  # Disk space service binary
-├── debian/
-│   ├── *.service           # Systemd service definitions
-│   └── *.timer             # Systemd timer definitions
+├── tests/
+│   └── fixtures/           # TOML fixture files for config tests
+├── systemd/user/           # Systemd service and timer definitions
+├── debian/                 # Debian package scripts
 ├── Cargo.toml              # Project dependencies
 └── README.adoc             # This file
 ----
 
 === Code style
 
-Follow the coding standards in [CLAUDE.md](CLAUDE.md):
+Follow the coding standards in link:CLAUDE.md[CLAUDE.md]:
 
-* Use Australian English spelling
 * Write clear, simple documentation
-* Provide comprehensive tests
+* Provide comprehensive tests (unit, property-based, and fixture-based for config)
 * Use `crate::` prefix for internal imports
 
 === Running individual monitors
@@ -194,7 +242,10 @@ cargo run --bin diskspace-monitor
 * notify-rust 4 (desktop notifications)
 * battery 0.7 (battery information)
 * sysinfo 0.32 (disk space information)
-* proptest 1.5 (property-based testing)
+* serde 1 with derive feature (config serialisation)
+* toml 1 (config file parsing)
+* merge 0.2 (deep config merging)
+* proptest 1.5 (property-based testing, dev only)
 
 == License
 
@@ -224,30 +275,35 @@ Check service status:
 
 [source,bash]
 ----
-systemctl status battery-monitor.timer
-systemctl status diskspace-monitor.timer
+systemctl --user status battery-monitor.timer
+systemctl --user status diskspace-monitor.timer
 ----
 
 View service logs:
 
 [source,bash]
 ----
-journalctl -xeu battery-monitor.service
-journalctl -xeu diskspace-monitor.service
+journalctl --user -xeu battery-monitor.service
+journalctl --user -xeu diskspace-monitor.service
+----
+
+=== Config file is malformed
+
+If the config file cannot be parsed, both monitors send a desktop notification and print the error to stderr, then exit without checking. Fix the config file, then check logs for the parse error:
+
+[source,bash]
+----
+journalctl --user -u battery-monitor.service
+journalctl --user -u diskspace-monitor.service
 ----
 
 === Battery service fails on desktop systems
 
-The battery monitor gracefully handles systems without batteries. Check the logs to confirm:
+The battery monitor exits silently on systems without a battery. You can disable the battery monitor timer on desktop systems:
 
 [source,bash]
 ----
-journalctl -u battery-monitor.service
+systemctl --user disable --now battery-monitor.timer
 ----
 
-You may disable the battery monitor timer on desktop systems:
-
-[source,bash]
-----
-sudo systemctl disable --now battery-monitor.timer
-----
+Or set `disabled = true` in the config file under `[battery]`.
