@@ -55,19 +55,20 @@ pub fn get_battery_info() -> Option<BatteryInfo> {
     let battery = batteries.next()?.ok()?;
 
     // Calculate percentage (state_of_charge returns a ratio from 0.0 to 1.0)
-    let percent = (battery.state_of_charge().get::<battery::units::ratio::percent>())
-        .min(100.0)
-        .max(0.0);
+    let percent = (battery
+        .state_of_charge()
+        .get::<battery::units::ratio::percent>())
+    .min(100.0)
+    .max(0.0);
 
     // Determine if plugged in based on state
-    let plugged_in = matches!(
-        battery.state(),
-        State::Charging | State::Full
-    );
+    let plugged_in = matches!(battery.state(), State::Charging | State::Full);
 
     // Get time remaining (only meaningful when discharging)
     let time_remaining_secs = if !plugged_in {
-        battery.time_to_empty().map(|duration| duration.get::<battery::units::time::second>() as u64)
+        battery
+            .time_to_empty()
+            .map(|duration| duration.get::<battery::units::time::second>() as u64)
     } else {
         None
     };
@@ -90,7 +91,11 @@ pub fn get_battery_info() -> Option<BatteryInfo> {
 /// # Returns
 ///
 /// A formatted message string describing the battery status
-pub fn format_battery_message(threshold: f32, time_remaining: Option<u64>, is_critical: bool) -> String {
+pub fn format_battery_message(
+    threshold: f32,
+    time_remaining: Option<u64>,
+    is_critical: bool,
+) -> String {
     let mut message = format!("Your battery is below {}%", threshold);
 
     if is_critical {
@@ -98,7 +103,10 @@ pub fn format_battery_message(threshold: f32, time_remaining: Option<u64>, is_cr
     }
 
     if let Some(secs) = time_remaining {
-        message.push_str(&format!(". You have approximately {} of battery remaining", secs_to_hours(secs)));
+        message.push_str(&format!(
+            ". You have approximately {} of battery remaining",
+            secs_to_hours(secs)
+        ));
     }
 
     message.push('.');
@@ -120,13 +128,25 @@ fn determine_notification_with_thresholds(
 
     if percent <= critical {
         let message = format_battery_message(critical, battery.time_remaining_secs, true);
-        Some(("Low battery warning".to_string(), message, NotificationType::Error))
+        Some((
+            "Low battery warning".to_string(),
+            message,
+            NotificationType::Error,
+        ))
     } else if percent <= very_low {
         let message = format_battery_message(very_low, battery.time_remaining_secs, true);
-        Some(("Low battery warning".to_string(), message, NotificationType::Info))
+        Some((
+            "Low battery warning".to_string(),
+            message,
+            NotificationType::Info,
+        ))
     } else if percent <= low {
         let message = format_battery_message(low, battery.time_remaining_secs, false);
-        Some(("Low battery notice".to_string(), message, NotificationType::Info))
+        Some((
+            "Low battery notice".to_string(),
+            message,
+            NotificationType::Info,
+        ))
     } else {
         None
     }
@@ -145,7 +165,7 @@ pub fn check_and_notify(config: &BatteryConfig) {
     // are guaranteed to be Some. Panicking here would indicate a programming
     // error (check_and_notify called without a merged config).
     let t = config.thresholds.as_ref().unwrap();
-    let low      = t.low.unwrap();
+    let low = t.low.unwrap();
     let very_low = t.very_low.unwrap();
     let critical = t.critical.unwrap();
 
@@ -215,13 +235,21 @@ mod tests {
 
     #[test]
     fn test_determine_notification_plugged_in() {
-        let battery = BatteryInfo { plugged_in: true, percent: 5.0, time_remaining_secs: None };
+        let battery = BatteryInfo {
+            plugged_in: true,
+            percent: 5.0,
+            time_remaining_secs: None,
+        };
         assert_eq!(notify_default(&battery), None);
     }
 
     #[test]
     fn test_determine_notification_critical() {
-        let battery = BatteryInfo { plugged_in: false, percent: 4.0, time_remaining_secs: Some(300) };
+        let battery = BatteryInfo {
+            plugged_in: false,
+            percent: 4.0,
+            time_remaining_secs: Some(300),
+        };
         let (title, message, notif_type) = notify_default(&battery).unwrap();
         assert_eq!(title, "Low battery warning");
         assert!(message.contains("below 5%"));
@@ -230,7 +258,11 @@ mod tests {
 
     #[test]
     fn test_determine_notification_very_low() {
-        let battery = BatteryInfo { plugged_in: false, percent: 8.0, time_remaining_secs: Some(600) };
+        let battery = BatteryInfo {
+            plugged_in: false,
+            percent: 8.0,
+            time_remaining_secs: Some(600),
+        };
         let (title, message, notif_type) = notify_default(&battery).unwrap();
         assert_eq!(title, "Low battery warning");
         assert!(message.contains("below 10%"));
@@ -239,7 +271,11 @@ mod tests {
 
     #[test]
     fn test_determine_notification_low() {
-        let battery = BatteryInfo { plugged_in: false, percent: 12.0, time_remaining_secs: Some(1800) };
+        let battery = BatteryInfo {
+            plugged_in: false,
+            percent: 12.0,
+            time_remaining_secs: Some(1800),
+        };
         let (title, message, notif_type) = notify_default(&battery).unwrap();
         assert_eq!(title, "Low battery notice");
         assert!(message.contains("below 15%"));
@@ -248,26 +284,46 @@ mod tests {
 
     #[test]
     fn test_determine_notification_ok() {
-        let battery = BatteryInfo { plugged_in: false, percent: 50.0, time_remaining_secs: Some(7200) };
+        let battery = BatteryInfo {
+            plugged_in: false,
+            percent: 50.0,
+            time_remaining_secs: Some(7200),
+        };
         assert_eq!(notify_default(&battery), None);
     }
 
     #[test]
     fn test_determine_notification_at_threshold() {
-        let battery_critical = BatteryInfo { plugged_in: false, percent: 5.0, time_remaining_secs: Some(300) };
+        let battery_critical = BatteryInfo {
+            plugged_in: false,
+            percent: 5.0,
+            time_remaining_secs: Some(300),
+        };
         assert!(notify_default(&battery_critical).is_some());
 
-        let battery_very_low = BatteryInfo { plugged_in: false, percent: 10.0, time_remaining_secs: Some(600) };
+        let battery_very_low = BatteryInfo {
+            plugged_in: false,
+            percent: 10.0,
+            time_remaining_secs: Some(600),
+        };
         assert!(notify_default(&battery_very_low).is_some());
 
-        let battery_low = BatteryInfo { plugged_in: false, percent: 15.0, time_remaining_secs: Some(1200) };
+        let battery_low = BatteryInfo {
+            plugged_in: false,
+            percent: 15.0,
+            time_remaining_secs: Some(1200),
+        };
         assert!(notify_default(&battery_low).is_some());
     }
 
     #[test]
     fn test_determine_notification_custom_thresholds() {
         // Verify that custom thresholds from user config are respected.
-        let battery = BatteryInfo { plugged_in: false, percent: 18.0, time_remaining_secs: None };
+        let battery = BatteryInfo {
+            plugged_in: false,
+            percent: 18.0,
+            time_remaining_secs: None,
+        };
         // With defaults (15/10/5), 18% triggers nothing.
         assert_eq!(notify_default(&battery), None);
         // With a user-raised low threshold of 20%, 18% triggers a notice.
@@ -279,8 +335,16 @@ mod tests {
 
     #[test]
     fn test_battery_info_equality() {
-        let battery1 = BatteryInfo { plugged_in: false, percent: 50.0, time_remaining_secs: Some(3600) };
-        let battery2 = BatteryInfo { plugged_in: false, percent: 50.0, time_remaining_secs: Some(3600) };
+        let battery1 = BatteryInfo {
+            plugged_in: false,
+            percent: 50.0,
+            time_remaining_secs: Some(3600),
+        };
+        let battery2 = BatteryInfo {
+            plugged_in: false,
+            percent: 50.0,
+            time_remaining_secs: Some(3600),
+        };
         assert_eq!(battery1, battery2);
     }
 }

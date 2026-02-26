@@ -131,7 +131,7 @@ mod tests {
         let cfg = Config::default();
         let battery = cfg.battery.unwrap();
         let t = battery.thresholds.unwrap();
-        assert_eq!(t.low,      Some(15.0));
+        assert_eq!(t.low, Some(15.0));
         assert_eq!(t.very_low, Some(10.0));
         assert_eq!(t.critical, Some(5.0));
         assert_eq!(battery.disabled, Some(false));
@@ -142,7 +142,7 @@ mod tests {
         let cfg = Config::default();
         let disk = cfg.diskspace.unwrap();
         let t = disk.thresholds.unwrap();
-        assert_eq!(t.low,      Some(90.0));
+        assert_eq!(t.low, Some(90.0));
         assert_eq!(t.very_low, Some(95.0));
         assert_eq!(t.critical, Some(97.5));
         assert_eq!(disk.disabled, Some(false));
@@ -154,7 +154,10 @@ mod tests {
     #[test]
     fn test_merge_fills_missing_battery_section() {
         // No battery section at all — should be populated from defaults.
-        let partial = Config { battery: None, diskspace: None };
+        let partial = Config {
+            battery: None,
+            diskspace: None,
+        };
         let merged = partial.merge_with_default();
         let t = merged.battery.unwrap().thresholds.unwrap();
         assert_eq!(t.low, Some(15.0));
@@ -164,14 +167,17 @@ mod tests {
     fn test_merge_preserves_disabled_and_fills_thresholds() {
         // User sets disabled but omits thresholds entirely.
         let partial = Config {
-            battery: Some(BatteryConfig { disabled: Some(true), thresholds: None }),
+            battery: Some(BatteryConfig {
+                disabled: Some(true),
+                thresholds: None,
+            }),
             diskspace: None,
         };
         let merged = partial.merge_with_default();
         let battery = merged.battery.unwrap();
         assert_eq!(battery.disabled, Some(true)); // user value kept
         let t = battery.thresholds.unwrap();
-        assert_eq!(t.low,      Some(15.0)); // filled from defaults
+        assert_eq!(t.low, Some(15.0)); // filled from defaults
         assert_eq!(t.very_low, Some(10.0));
         assert_eq!(t.critical, Some(5.0));
     }
@@ -192,9 +198,9 @@ mod tests {
         };
         let merged = partial.merge_with_default();
         let t = merged.battery.unwrap().thresholds.unwrap();
-        assert_eq!(t.low,      Some(25.0)); // user override
+        assert_eq!(t.low, Some(25.0)); // user override
         assert_eq!(t.very_low, Some(10.0)); // from defaults
-        assert_eq!(t.critical, Some(5.0));  // from defaults
+        assert_eq!(t.critical, Some(5.0)); // from defaults
     }
 
     // ── TOML parsing (inline strings) ─────────────────────────────────────────
@@ -217,13 +223,13 @@ mod tests {
         "#;
         let cfg = Config::from_str(toml).unwrap().merge_with_default();
         let bt = cfg.battery.unwrap().thresholds.unwrap();
-        assert_eq!(bt.low,      Some(20.0));
+        assert_eq!(bt.low, Some(20.0));
         assert_eq!(bt.very_low, Some(12.0));
         assert_eq!(bt.critical, Some(6.0));
         let dt = cfg.diskspace.unwrap();
         assert_eq!(dt.paths, Some(vec!["/".to_string(), "/home".to_string()]));
         let dt = dt.thresholds.unwrap();
-        assert_eq!(dt.low,      Some(85.0));
+        assert_eq!(dt.low, Some(85.0));
         assert_eq!(dt.very_low, Some(92.0));
         assert_eq!(dt.critical, Some(96.0));
     }
@@ -236,9 +242,9 @@ mod tests {
         "#;
         let cfg = Config::from_str(toml).unwrap().merge_with_default();
         let t = cfg.battery.unwrap().thresholds.unwrap();
-        assert_eq!(t.low,      Some(25.0)); // user value
+        assert_eq!(t.low, Some(25.0)); // user value
         assert_eq!(t.very_low, Some(10.0)); // default
-        assert_eq!(t.critical, Some(5.0));  // default
+        assert_eq!(t.critical, Some(5.0)); // default
     }
 
     #[test]
@@ -257,9 +263,9 @@ mod tests {
         );
         let cfg = Config::from_file(path).unwrap().merge_with_default();
         let t = cfg.battery.unwrap().thresholds.unwrap();
-        assert_eq!(t.low,      Some(25.0)); // from fixture
+        assert_eq!(t.low, Some(25.0)); // from fixture
         assert_eq!(t.very_low, Some(10.0)); // default
-        assert_eq!(t.critical, Some(5.0));  // default
+        assert_eq!(t.critical, Some(5.0)); // default
     }
 
     #[test]

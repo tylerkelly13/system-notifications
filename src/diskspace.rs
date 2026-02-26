@@ -136,11 +136,23 @@ fn determine_notification_with_thresholds(
     let message = format_diskspace_message(info);
 
     if percent >= critical {
-        Some(("Disk space critical".to_string(), message, NotificationType::Error))
+        Some((
+            "Disk space critical".to_string(),
+            message,
+            NotificationType::Error,
+        ))
     } else if percent >= very_low {
-        Some(("Low disk space warning".to_string(), message, NotificationType::Info))
+        Some((
+            "Low disk space warning".to_string(),
+            message,
+            NotificationType::Info,
+        ))
     } else if percent >= low {
-        Some(("Low disk space notice".to_string(), message, NotificationType::Info))
+        Some((
+            "Low disk space notice".to_string(),
+            message,
+            NotificationType::Info,
+        ))
     } else {
         None
     }
@@ -160,7 +172,7 @@ pub fn check_and_notify(config: &DiskConfig) {
     // error (check_and_notify called without a merged config).
     let paths = config.paths.as_deref().unwrap();
     let t = config.thresholds.as_ref().unwrap();
-    let low      = t.low.unwrap();
+    let low = t.low.unwrap();
     let very_low = t.very_low.unwrap();
     let critical = t.critical.unwrap();
 
