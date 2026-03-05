@@ -92,11 +92,11 @@ pub fn get_battery_info() -> Option<BatteryInfo> {
 ///
 /// A formatted message string describing the battery status
 pub fn format_battery_message(
-    threshold: f32,
+    percentage: f32,
     time_remaining: Option<u64>,
     is_critical: bool,
 ) -> String {
-    let mut message = format!("Your battery is below {}%", threshold);
+    let mut message = format!("Your battery is at {}%", percentage);
 
     if is_critical {
         message.push_str(", plug in your device or prepare for shutdown");
@@ -104,7 +104,7 @@ pub fn format_battery_message(
 
     if let Some(secs) = time_remaining {
         message.push_str(&format!(
-            ". You have approximately {} of battery remaining",
+            ". You have approximately {} of power remaining",
             secs_to_hours(secs)
         ));
     }
@@ -127,21 +127,21 @@ fn determine_notification_with_thresholds(
     let percent = battery.percent;
 
     if percent <= critical {
-        let message = format_battery_message(critical, battery.time_remaining_secs, true);
+        let message = format_battery_message(percent.round(), battery.time_remaining_secs, true);
         Some((
             "Low battery warning".to_string(),
             message,
             NotificationType::Error,
         ))
     } else if percent <= very_low {
-        let message = format_battery_message(very_low, battery.time_remaining_secs, true);
+        let message = format_battery_message(percent.round(), battery.time_remaining_secs, true);
         Some((
             "Low battery warning".to_string(),
             message,
             NotificationType::Info,
         ))
     } else if percent <= low {
-        let message = format_battery_message(low, battery.time_remaining_secs, false);
+        let message = format_battery_message(percent.round(), battery.time_remaining_secs, false);
         Some((
             "Low battery notice".to_string(),
             message,
@@ -212,7 +212,7 @@ mod tests {
     #[test]
     fn test_format_battery_message_critical() {
         let msg = format_battery_message(5.0, Some(600), true);
-        assert!(msg.contains("below 5%"));
+        assert!(msg.contains("at 5%"));
         assert!(msg.contains("plug in"));
         assert!(msg.contains("0:10:00"));
     }
@@ -220,7 +220,7 @@ mod tests {
     #[test]
     fn test_format_battery_message_non_critical() {
         let msg = format_battery_message(15.0, Some(3600), false);
-        assert!(msg.contains("below 15%"));
+        assert!(msg.contains("at 15%"));
         assert!(!msg.contains("plug in"));
         assert!(msg.contains("1:00:00"));
     }
@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn test_format_battery_message_no_time() {
         let msg = format_battery_message(10.0, None, true);
-        assert!(msg.contains("below 10%"));
+        assert!(msg.contains("at 10%"));
         assert!(msg.contains("plug in"));
         assert!(!msg.contains("approximately"));
     }
@@ -252,7 +252,7 @@ mod tests {
         };
         let (title, message, notif_type) = notify_default(&battery).unwrap();
         assert_eq!(title, "Low battery warning");
-        assert!(message.contains("below 5%"));
+        assert!(message.contains("at 4%"));
         assert_eq!(notif_type, NotificationType::Error);
     }
 
@@ -265,7 +265,7 @@ mod tests {
         };
         let (title, message, notif_type) = notify_default(&battery).unwrap();
         assert_eq!(title, "Low battery warning");
-        assert!(message.contains("below 10%"));
+        assert!(message.contains("at 8%"));
         assert_eq!(notif_type, NotificationType::Info);
     }
 
@@ -278,7 +278,7 @@ mod tests {
         };
         let (title, message, notif_type) = notify_default(&battery).unwrap();
         assert_eq!(title, "Low battery notice");
-        assert!(message.contains("below 15%"));
+        assert!(message.contains("at 12%"));
         assert_eq!(notif_type, NotificationType::Info);
     }
 
