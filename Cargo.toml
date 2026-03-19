@@ -4,7 +4,7 @@ version = "0.2.0"
 edition = "2021"
 description = "System monitoring services that send desktop notifications for battery and disk space events"
 authors = ["Tyler Kelly <tyler.kelly@outlook.com>"]
-license = "MIT"
+license = "GPL-3.0-only"
 repository = "https://github.com/tylerkelly/system-notifier"
 readme = "README.adoc"
 

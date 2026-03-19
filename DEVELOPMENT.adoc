@@ -1,17 +1,97 @@
 :toc:
 :toclevels: 3
-:project-name: System notifications service
+:project-name: System Notifier
 
-= {project-name} architecture
+= {project-name}: Development Guide
 
-== What this is
+== Getting started
 
-A group of Rust-based systemd user services for monitoring:
+=== Prerequisites
 
-* Battery levels
-* Disk space usage
+* Rust 2021 edition or later (`rustup` recommended)
+* A freedesktop-compatible desktop environment (for notifications)
+* systemd (for running services)
 
-Users receive desktop notifications when thresholds are crossed.
+=== Building
+
+Build the project in release mode:
+
+[source,bash]
+----
+cargo build --release
+----
+
+=== Running individual monitors
+
+For testing, run monitors directly without installing:
+
+[source,bash]
+----
+cargo run --bin battery-monitor
+cargo run --bin diskspace-monitor
+----
+
+=== Testing
+
+Run all tests including property-based tests:
+
+[source,bash]
+----
+cargo test
+----
+
+For test coverage analysis:
+
+[source,bash]
+----
+cargo tarpaulin
+----
+
+=== Building the Debian package
+
+[source,bash]
+----
+dpkg-buildpackage -us -uc -b
+----
+
+The generated `.deb` file appears in the parent directory.
+
+== Project structure
+
+[source]
+----
+system-notifier/
+├── src/
+│   ├── lib.rs              # Library root
+│   ├── common.rs           # Shared notification code
+│   ├── config.rs           # TOML config loading and deep merge
+│   ├── battery.rs          # Battery monitoring logic
+│   ├── diskspace.rs        # Disk space monitoring logic
+│   └── bin/
+│       ├── battery-monitor.rs    # Battery service binary
+│       └── diskspace-monitor.rs  # Disk space service binary
+├── tests/
+│   └── fixtures/           # TOML fixture files for config tests
+├── systemd/user/           # Systemd service and timer definitions
+├── debian/                 # Debian package scripts
+└── Cargo.toml              # Project dependencies
+----
+
+== Dependencies
+
+* `notify-rust` 4 — desktop notifications
+* `battery` 0.7 — battery information
+* `sysinfo` 0.32 — disk space information
+* `serde` 1 with derive feature — config serialisation
+* `toml` 1 — config file parsing
+* `merge` 0.2 — deep config merging
+* `proptest` 1.5 — property-based testing (dev dependency)
+
+== Code style
+
+* Write clear, simple documentation
+* Provide comprehensive tests (unit, property-based, and fixture-based for config)
+* Use `crate::` prefix for internal imports
 
 == Architecture overview
 
@@ -173,9 +253,9 @@ None. All functionality is local to the user's machine.
 * *Why*: Disabling a systemd timer requires `systemctl --user` commands and survives package reinstalls imperfectly. A config flag is simpler and survives reinstalls cleanly.
 * *Tradeoff*: The timer still fires on schedule; it just does nothing. Acceptable given the binary is cheap to start.
 
-== AI agent notes
+== Development notes
 
-=== Don't modify
+Keep in mind:
 
 * `Config::default()` is the single source of truth for all default threshold values. Do not add threshold constants elsewhere.
 * `merge_option_deep` in `config.rs` is intentional — do not replace it with `merge::option::overwrite_none` at the `Config` level or partial user configs will break.
@@ -194,9 +274,3 @@ None. All functionality is local to the user's machine.
 * Tests for notification logic use the private `determine_notification_with_thresholds` helper directly with explicit threshold values, not a public wrapper. This keeps threshold values visible in the test.
 * Fixture TOML files in `tests/fixtures/` cover config loading and merge scenarios.
 
-== Future ideas
-
-* Network connectivity monitor
-* CPU / memory pressure monitor
-* `once_cell` / `LazyLock` for `Config::default()` if startup cost becomes measurable
-* Config file watcher (reload without restarting the timer)
