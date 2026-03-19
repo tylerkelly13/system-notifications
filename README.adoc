@@ -1,10 +1,9 @@
 = System Notifier
 :toc:
+
 :toclevels: 2
 
 A collection of system monitoring services that send desktop notifications for important system events.
-
-== What this is
 
 System Notifier provides monitoring services for:
 
