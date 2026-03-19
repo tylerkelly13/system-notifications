@@ -1,6 +1,6 @@
 [package]
 name = "system-notifier"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 description = "System monitoring services that send desktop notifications for battery and disk space events"
 authors = ["Tyler Kelly <tyler.kelly@outlook.com>"]
