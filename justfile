@@ -38,12 +38,16 @@ build:
     cargo build --release
 
 # Build Debian package
-build-deb:
+deb:
     cargo deb
 
 # Install binary locally to ~/.cargo/bin
 install:
     cargo install --path .
+
+# Run tests with code coverage
+coverage:
+    cargo tarpaulin --engine llvm --out html --output-dir target/tarpaulin
 
 # Clean build artifacts
 clean:

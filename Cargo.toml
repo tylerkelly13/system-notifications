@@ -27,6 +27,9 @@ path = "src/bin/battery-monitor.rs"
 name = "diskspace-monitor"
 path = "src/bin/diskspace-monitor.rs"
 
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ['cfg(tarpaulin_include)'] }
+
 [package.metadata.deb]
 maintainer = "Tyler Kelly <tyler.kelly@outlook.com>"
 copyright = "2026, Tyler Kelly <tyler.kelly@outlook.com>"

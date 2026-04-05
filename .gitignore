@@ -1,8 +1,6 @@
 # Rust
 /target/
-Cargo.lock
-**/*.rs.bk
-*.pdb
+*.profraw
 
 # Coverage
 /coverage/
@@ -12,21 +10,8 @@ cobertura.xml
 # Property-based test regressions
 proptest-regressions/
 
-# Debian packaging
-debian/.debhelper/
-debian/debhelper-build-stamp
-debian/files
-debian/*.log
-debian/*.substvars
-debian/tmp/
-debian/$PROJECT_NAME/
-
 # Build artifacts
 *.deb
-*.ddeb
-*.buildinfo
-*.changes
-*.dsc
 *.tar.*
 
 # IDE
@@ -42,3 +27,5 @@ flycheck_*.rs
 # OS
 .DS_Store
 Thumbs.db
+
+/build
