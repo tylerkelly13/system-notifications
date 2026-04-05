@@ -62,12 +62,12 @@ impl Config {
         Ok(config)
     }
 
-    pub fn from_str(s: &str) -> Result<Self, Box<dyn std::error::Error>> {
+    pub fn config_from_str(s: &str) -> Result<Self, Box<dyn std::error::Error>> {
         let config = from_toml_str(s)?;
         Ok(config)
     }
 
-    pub fn default() -> Self {
+    pub fn defaults() -> Self {
         Self {
             battery: Some(BatteryConfig {
                 thresholds: Some(BatteryThreshold {
@@ -90,8 +90,8 @@ impl Config {
     }
 
     // Deep-merge with defaults so every nested field is guaranteed to be Some.
-    pub fn merge_with_default(mut self) -> Self {
-        let default = Self::default();
+    pub fn merge_with_defaults(mut self) -> Self {
+        let default = Self::defaults();
         self.merge(default);
         self
     }
@@ -113,10 +113,10 @@ impl Config {
         for path in &candidates {
             if std::path::Path::new(path).exists() {
                 let loaded = Self::from_file(path)?;
-                return Ok(loaded.merge_with_default());
+                return Ok(loaded.merge_with_defaults());
             }
         }
-        Ok(Self::default())
+        Ok(Self::defaults())
     }
 }
 
@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn test_default_battery_values() {
-        let cfg = Config::default();
+        let cfg = Config::defaults();
         let battery = cfg.battery.unwrap();
         let t = battery.thresholds.unwrap();
         assert_eq!(t.low, Some(15.0));
@@ -139,7 +139,7 @@ mod tests {
 
     #[test]
     fn test_default_diskspace_values() {
-        let cfg = Config::default();
+        let cfg = Config::defaults();
         let disk = cfg.diskspace.unwrap();
         let t = disk.thresholds.unwrap();
         assert_eq!(t.low, Some(90.0));
@@ -149,7 +149,7 @@ mod tests {
         assert_eq!(disk.paths, Some(vec!["/".to_string()]));
     }
 
-    // ── merge_with_default ────────────────────────────────────────────────────
+    // ── merge_with_defaults ────────────────────────────────────────────────────
 
     #[test]
     fn test_merge_fills_missing_battery_section() {
@@ -158,7 +158,7 @@ mod tests {
             battery: None,
             diskspace: None,
         };
-        let merged = partial.merge_with_default();
+        let merged = partial.merge_with_defaults();
         let t = merged.battery.unwrap().thresholds.unwrap();
         assert_eq!(t.low, Some(15.0));
     }
@@ -173,7 +173,7 @@ mod tests {
             }),
             diskspace: None,
         };
-        let merged = partial.merge_with_default();
+        let merged = partial.merge_with_defaults();
         let battery = merged.battery.unwrap();
         assert_eq!(battery.disabled, Some(true)); // user value kept
         let t = battery.thresholds.unwrap();
@@ -196,7 +196,7 @@ mod tests {
             }),
             diskspace: None,
         };
-        let merged = partial.merge_with_default();
+        let merged = partial.merge_with_defaults();
         let t = merged.battery.unwrap().thresholds.unwrap();
         assert_eq!(t.low, Some(25.0)); // user override
         assert_eq!(t.very_low, Some(10.0)); // from defaults
@@ -206,7 +206,7 @@ mod tests {
     // ── TOML parsing (inline strings) ─────────────────────────────────────────
 
     #[test]
-    fn test_from_str_full_config() {
+    fn test_config_from_str_full_config() {
         let toml = r#"
             [battery]
             disabled = false
@@ -221,7 +221,7 @@ mod tests {
             very_low = 92.0
             critical = 96.0
         "#;
-        let cfg = Config::from_str(toml).unwrap().merge_with_default();
+        let cfg = Config::config_from_str(toml).unwrap().merge_with_defaults();
         let bt = cfg.battery.unwrap().thresholds.unwrap();
         assert_eq!(bt.low, Some(20.0));
         assert_eq!(bt.very_low, Some(12.0));
@@ -235,12 +235,12 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_partial_merges_with_defaults() {
+    fn test_config_from_str_partial_merges_with_defaults() {
         let toml = r#"
             [battery.thresholds]
             low = 25.0
         "#;
-        let cfg = Config::from_str(toml).unwrap().merge_with_default();
+        let cfg = Config::config_from_str(toml).unwrap().merge_with_defaults();
         let t = cfg.battery.unwrap().thresholds.unwrap();
         assert_eq!(t.low, Some(25.0)); // user value
         assert_eq!(t.very_low, Some(10.0)); // default
@@ -248,8 +248,8 @@ mod tests {
     }
 
     #[test]
-    fn test_from_str_malformed_returns_error() {
-        let result = Config::from_str("this is not : valid toml ][");
+    fn test_config_from_str_malformed_returns_error() {
+        let result = Config::config_from_str("this is not : valid toml ][");
         assert!(result.is_err());
     }
 
@@ -261,7 +261,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/partial_battery_threshold.toml"
         );
-        let cfg = Config::from_file(path).unwrap().merge_with_default();
+        let cfg = Config::from_file(path).unwrap().merge_with_defaults();
         let t = cfg.battery.unwrap().thresholds.unwrap();
         assert_eq!(t.low, Some(25.0)); // from fixture
         assert_eq!(t.very_low, Some(10.0)); // default
@@ -274,7 +274,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/tests/fixtures/battery_disabled.toml"
         );
-        let cfg = Config::from_file(path).unwrap().merge_with_default();
+        let cfg = Config::from_file(path).unwrap().merge_with_defaults();
         let battery = cfg.battery.unwrap();
         assert_eq!(battery.disabled, Some(true));
         // Thresholds must still be populated even though disabled = true.
