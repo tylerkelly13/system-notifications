@@ -10,7 +10,7 @@ readme = "README.adoc"
 
 [dependencies]
 notify-rust = "4"
-sysinfo = "0.32"
+sysinfo = "0.38"
 battery = "0.7"
 toml = "1.0.3"
 serde = { version = "1.0.228", features = ["derive"] }
