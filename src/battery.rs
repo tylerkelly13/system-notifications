@@ -58,8 +58,7 @@ pub fn get_battery_info() -> Option<BatteryInfo> {
     let percent = (battery
         .state_of_charge()
         .get::<battery::units::ratio::percent>())
-    .min(100.0)
-    .max(0.0);
+    .clamp(0.0, 100.0);
 
     // Determine if plugged in based on state
     let plugged_in = matches!(battery.state(), State::Charging | State::Full);
