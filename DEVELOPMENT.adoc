@@ -229,6 +229,33 @@ If a config file exists but cannot be parsed, the binary:
 All default values live in `Config::default()` in `src/config.rs`.
 The monitor libraries (`battery.rs`, `diskspace.rs`) contain no hardcoded threshold values — they receive a fully-merged config and call `.unwrap()` on every field knowing the merge guarantees they are populated.
 
+== CI/CD pipeline
+
+image::.github/workflows/ci-cd-pipeline.svg[CI/CD Pipeline]
+
+.Mermaid source
+[%collapsible]
+====
+[source,mermaid]
+----
+graph LR
+    subgraph checks["check.yml — PR / manual"]
+        A1["pull_request / workflow_dispatch"] --> A2["rust-run-checks.yml\n(coverage: true)"]
+    end
+
+    subgraph deploy["deploy.yml — tag push"]
+        B1["push tag v*"] --> B2["rust-run-checks.yml"]
+        B2 -->|"artifact-id"| B3["rust-gh-release.yml"]
+    end
+----
+====
+
+=== Workflow summary
+
+* **check.yml** — Runs on pull requests to `main` and `release/*` branches, and on manual dispatch. Calls the `rust-run-checks` reusable workflow with coverage enabled. Ignores documentation and Dockerfile changes.
+* **deploy.yml** — Triggers on `v*` tag pushes. Calls `rust-run-checks` first, then passes the build artifact to `rust-gh-release` to create a draft GitHub release.
+* All reusable workflows live in the https://github.com/tylerkelly13/.github[tylerkelly13/.github] repository. See https://github.com/tylerkelly13/.github/blob/main/.github/WORKFLOWS.adoc[WORKFLOWS.adoc] for internal details.
+
 == External integrations
 
 None. All functionality is local to the user's machine.
