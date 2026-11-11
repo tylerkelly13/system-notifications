@@ -110,7 +110,7 @@ pub fn notify(notification_type: NotificationType, app: App, title: &str, body: 
     let urgency = get_urgency(&notification_type);
     let appname = get_appname(&app);
 
-    let _ = Notification::new()
+    let result = Notification::new()
         .summary(title)
         .appname(appname)
         .body(body)
@@ -119,6 +119,12 @@ pub fn notify(notification_type: NotificationType, app: App, title: &str, body: 
         .urgency(urgency)
         .hint(Hint::Category("system".to_string()))
         .show();
+
+    if let Err(e) = result {
+        eprintln!(
+            "system-monitor: could not show notification \"{title}\": {e}. Check that a notification daemon is running."
+        );
+    }
 }
 
 /// Sends an error notification with critical urgency.
