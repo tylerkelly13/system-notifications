@@ -78,7 +78,7 @@ pub fn bytes_to_human(bytes: u64) -> String {
 /// * `Some(DiskSpaceInfo)` if the path exists and information is available
 /// * `None` if the path does not exist or information cannot be retrieved
 pub fn get_disk_space_info(path: &str) -> Option<DiskSpaceInfo> {
-    let disks = Disks::new_with_refreshed_list();
+    let disks = Disks::new_with_refreshed_list().ok()?;
 
     let path_obj = Path::new(path);
 

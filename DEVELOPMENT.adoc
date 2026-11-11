@@ -243,6 +243,10 @@ graph LR
         A1["pull_request / workflow_dispatch"] --> A2["rust-run-checks.yml\n(coverage: true)"]
     end
 
+    subgraph audit["audit.yml: weekly / manual"]
+        C1["schedule / workflow_dispatch"] --> C2["rust-audit.yml\n(fail-on-findings: true)"]
+    end
+
     subgraph deploy["deploy.yml — tag push"]
         B1["push tag v*"] --> B2["rust-run-checks.yml"]
         B2 -->|"artifact-id"| B3["rust-gh-release.yml"]
@@ -252,7 +256,8 @@ graph LR
 
 === Workflow summary
 
-* **check.yml** — Runs on pull requests to `main` and `release/*` branches, and on manual dispatch. Calls the `rust-run-checks` reusable workflow with coverage enabled. Ignores documentation and Dockerfile changes.
+* **check.yml** — Runs on pull requests to `main` and `release/*` branches, and on manual dispatch. Calls the `rust-run-checks` reusable workflow with coverage enabled, which also runs `cargo deny` (configured by `deny.toml`) and `cargo machete` without failing the build. Ignores documentation and Dockerfile changes.
+* **audit.yml**: Runs weekly and on manual dispatch. Calls the `rust-audit` reusable workflow with `fail-on-findings: true`, so a new security advisory fails the run and GitHub sends a notification.
 * **deploy.yml** — Triggers on `v*` tag pushes. Calls `rust-run-checks` first, then passes the build artifact to `rust-gh-release` to create a draft GitHub release.
 * All reusable workflows live in the https://github.com/tylerkelly13/.github[tylerkelly13/.github] repository. See https://github.com/tylerkelly13/.github/blob/main/.github/WORKFLOWS.adoc[WORKFLOWS.adoc] for internal details.
 

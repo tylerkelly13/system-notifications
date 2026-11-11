@@ -10,7 +10,7 @@ readme = "README.adoc"
 
 [dependencies]
 notify-rust = "4"
-sysinfo = "0.39"
+sysinfo = "0.40"
 battery = "0.7"
 toml = "1.1.2"
 serde = { version = "1.0.228", features = ["derive"] }
@@ -48,3 +48,6 @@ assets = [
     ["systemd/user/diskspace-monitor.service", "usr/lib/systemd/user/", "644"],
     ["systemd/user/diskspace-monitor.timer", "usr/lib/systemd/user/", "644"],
 ]
+
+[lints.clippy]
+let_underscore_must_use = "warn"
