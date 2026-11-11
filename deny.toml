@@ -1,0 +1,28 @@
+# cargo-deny configuration, run in CI by the rust-audit reusable workflow.
+# Docs: https://embarkstudios.github.io/cargo-deny/checks/cfg.html
+
+[graph]
+all-features = true
+
+[advisories]
+# Defaults deny vulnerable, unmaintained, and yanked crates.
+
+[licenses]
+# Every license a locked dependency (or this crate) is published under, all GPL-3.0 compatible.
+allow = [
+  "Apache-2.0",
+  "Apache-2.0 WITH LLVM-exception",
+  "BSD-2-Clause",
+  "GPL-3.0-only",
+  "MIT",
+  "Unicode-3.0",
+]
+confidence-threshold = 0.8
+
+[bans]
+multiple-versions = "warn"
+wildcards = "deny"
+
+[sources]
+unknown-registry = "deny"
+unknown-git = "deny"

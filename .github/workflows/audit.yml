@@ -1,0 +1,19 @@
+name: Audit
+description: Re-audit dependencies weekly, since new advisories appear without any code change.
+
+on:
+  schedule:
+    - cron: "0 17 * * 0"
+  workflow_dispatch:
+
+# drop all default permissions; grant least privilege per job
+permissions: {}
+
+jobs:
+  Audit:
+    permissions:
+      contents: read
+    uses: tylerkelly13/.github/.github/workflows/rust-audit.yml@58e3010463ed83e807130f2725a6a0affc953200  # rust-audit-civ1
+    with:
+      # fail the run so GitHub sends a notification; nobody watches a passing scheduled run
+      fail-on-findings: true
