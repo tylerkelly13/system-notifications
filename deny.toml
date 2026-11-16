@@ -3,6 +3,8 @@
 
 [graph]
 all-features = true
+# Only check Linux: the project ships as a Debian package with systemd units.
+targets = ["x86_64-unknown-linux-gnu"]
 
 [advisories]
 # Defaults deny vulnerable, unmaintained, and yanked crates.
@@ -14,6 +16,7 @@ allow = [
   "Apache-2.0 WITH LLVM-exception",
   "BSD-2-Clause",
   "GPL-3.0-only",
+  "ISC",
   "MIT",
   "Unicode-3.0",
 ]

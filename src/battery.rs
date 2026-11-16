@@ -4,7 +4,7 @@
 
 use crate::common::{notify, App, NotificationType};
 use crate::config::BatteryConfig;
-use battery::{Manager, State};
+use starship_battery::{Manager, State};
 
 /// Battery information
 #[derive(Debug, Clone, PartialEq)]
@@ -57,7 +57,7 @@ pub fn get_battery_info() -> Option<BatteryInfo> {
     // Calculate percentage (state_of_charge returns a ratio from 0.0 to 1.0)
     let percent = (battery
         .state_of_charge()
-        .get::<battery::units::ratio::percent>())
+        .get::<starship_battery::units::ratio::percent>())
     .clamp(0.0, 100.0);
 
     // Determine if plugged in based on state
@@ -67,7 +67,7 @@ pub fn get_battery_info() -> Option<BatteryInfo> {
     let time_remaining_secs = if !plugged_in {
         battery
             .time_to_empty()
-            .map(|duration| duration.get::<battery::units::time::second>() as u64)
+            .map(|duration| duration.get::<starship_battery::units::time::second>() as u64)
     } else {
         None
     };

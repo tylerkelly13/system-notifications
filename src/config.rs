@@ -1,59 +1,95 @@
-use merge::Merge;
 use serde::{Deserialize, Serialize};
 use toml::from_str as from_toml_str;
 
-/// Recursively merges two `Option<T>` values where `T` itself implements `Merge`.
-/// If both sides are `Some`, the inner values are merged. If `left` is `None`,
-/// it is replaced with `right`.
-fn merge_option_deep<T: Merge>(left: &mut Option<T>, right: Option<T>) {
-    match (left.as_mut(), right) {
-        (Some(l), Some(r)) => l.merge(r),
-        (None, Some(r)) => *left = Some(r),
-        _ => {}
+/// Fills fields of `self` that are unset with the values from `other`, keeping values already set.
+trait Merge {
+    fn merge(&mut self, other: Self);
+}
+
+// Leaf values: `self` keeps its value, so a set `Option` is never overwritten.
+macro_rules! impl_merge_leaf {
+    ($($t:ty),*) => { $(impl Merge for $t { fn merge(&mut self, _other: Self) {} })* };
+}
+
+impl_merge_leaf!(f32, bool, Vec<String>);
+
+// A `None` takes the other side's value; two `Some` values merge recursively, so a
+// partial user section keeps its own fields and gets the rest from defaults.
+impl<T: Merge> Merge for Option<T> {
+    fn merge(&mut self, other: Self) {
+        match (self.as_mut(), other) {
+            (Some(left), Some(right)) => left.merge(right),
+            (None, right) => *self = right,
+            (Some(_), None) => {}
+        }
     }
 }
 
-#[derive(Serialize, Deserialize, Default, Merge)]
-#[merge(strategy = merge::option::overwrite_none)]
+// Implements `Merge` for a struct by merging each listed field. List every field,
+// or defaults won't fill the missing one.
+macro_rules! impl_merge {
+    ($t:ty { $($field:ident),* }) => {
+        impl Merge for $t {
+            fn merge(&mut self, other: Self) {
+                $(self.$field.merge(other.$field);)*
+            }
+        }
+    };
+}
+
+#[derive(Serialize, Deserialize, Default)]
 pub struct DiskThreshold {
     pub low: Option<f32>,
     pub very_low: Option<f32>,
     pub critical: Option<f32>,
 }
 
-#[derive(Serialize, Deserialize, Default, Merge)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct DiskConfig {
-    #[merge(strategy = merge::option::overwrite_none)]
     pub paths: Option<Vec<String>>,
-    #[merge(strategy = merge_option_deep)]
     pub thresholds: Option<DiskThreshold>,
-    #[merge(strategy = merge::option::overwrite_none)]
     pub disabled: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Default, Merge)]
-#[merge(strategy = merge::option::overwrite_none)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct BatteryThreshold {
     pub low: Option<f32>,
     pub very_low: Option<f32>,
     pub critical: Option<f32>,
 }
 
-#[derive(Serialize, Deserialize, Default, Merge)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct BatteryConfig {
-    #[merge(strategy = merge_option_deep)]
     pub thresholds: Option<BatteryThreshold>,
-    #[merge(strategy = merge::option::overwrite_none)]
     pub disabled: Option<bool>,
 }
 
-#[derive(Serialize, Deserialize, Merge, Default)]
+#[derive(Serialize, Deserialize, Default)]
 pub struct Config {
-    #[merge(strategy = merge_option_deep)]
     pub battery: Option<BatteryConfig>,
-    #[merge(strategy = merge_option_deep)]
     pub diskspace: Option<DiskConfig>,
 }
+
+impl_merge!(DiskThreshold {
+    low,
+    very_low,
+    critical
+});
+impl_merge!(DiskConfig {
+    paths,
+    thresholds,
+    disabled
+});
+impl_merge!(BatteryThreshold {
+    low,
+    very_low,
+    critical
+});
+impl_merge!(BatteryConfig {
+    thresholds,
+    disabled
+});
+impl_merge!(Config { battery, diskspace });
 
 impl Config {
     pub fn from_file(path: &str) -> Result<Self, Box<dyn std::error::Error>> {
@@ -201,6 +237,60 @@ mod tests {
         assert_eq!(t.low, Some(25.0)); // user override
         assert_eq!(t.very_low, Some(10.0)); // from defaults
         assert_eq!(t.critical, Some(5.0)); // from defaults
+    }
+
+    #[test]
+    fn merge_with_defaults_fills_every_field() {
+        // Catches a field missing from an `impl_merge!` list.
+        let merged = Config::default().merge_with_defaults();
+        let battery = merged.battery.unwrap();
+        let bt = battery.thresholds.unwrap();
+        assert!(battery.disabled.is_some());
+        assert!(bt.low.is_some() && bt.very_low.is_some() && bt.critical.is_some());
+        let disk = merged.diskspace.unwrap();
+        assert!(disk.paths.is_some() && disk.disabled.is_some());
+        let dt = disk.thresholds.unwrap();
+        assert!(dt.low.is_some() && dt.very_low.is_some() && dt.critical.is_some());
+    }
+
+    #[test]
+    fn merge_fills_missing_nested_fields_in_both_sections() {
+        // Partial user sections: each keeps its own fields and takes the rest from defaults.
+        let partial = Config {
+            battery: Some(BatteryConfig {
+                thresholds: Some(BatteryThreshold {
+                    low: None,
+                    very_low: Some(11.0),
+                    critical: None,
+                }),
+                disabled: None,
+            }),
+            diskspace: Some(DiskConfig {
+                paths: None,
+                thresholds: Some(DiskThreshold {
+                    low: None,
+                    very_low: None,
+                    critical: Some(99.0),
+                }),
+                disabled: Some(true),
+            }),
+        };
+        let merged = partial.merge_with_defaults();
+        let battery = merged.battery.unwrap();
+        let bt = battery.thresholds.unwrap();
+        assert_eq!(
+            (bt.low, bt.very_low, bt.critical),
+            (Some(15.0), Some(11.0), Some(5.0))
+        );
+        assert_eq!(battery.disabled, Some(false));
+        let disk = merged.diskspace.unwrap();
+        assert_eq!(disk.paths, Some(vec!["/".to_string()]));
+        assert_eq!(disk.disabled, Some(true));
+        let dt = disk.thresholds.unwrap();
+        assert_eq!(
+            (dt.low, dt.very_low, dt.critical),
+            (Some(90.0), Some(95.0), Some(99.0))
+        );
     }
 
     // ── TOML parsing (inline strings) ─────────────────────────────────────────

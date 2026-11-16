@@ -269,9 +269,9 @@ None. All functionality is local to the user's machine.
 
 === Deep merge instead of flat Option replacement
 
-* *What*: `Config`, `BatteryConfig`, `DiskConfig`, `BatteryThreshold`, and `DiskThreshold` all implement `Merge`. A custom `merge_option_deep` helper recurses into `Option<T>` when both sides are `Some`, rather than replacing the whole sub-tree.
+* *What*: `Config`, `BatteryConfig`, `DiskConfig`, `BatteryThreshold`, and `DiskThreshold` all implement a private `Merge` trait in `config.rs`, through the `impl_merge!` macro. The generic `Merge` impl for `Option<T>` recurses when both sides are `Some`, rather than replacing the whole sub-tree.
 * *Why*: A user who only wants to change one threshold should not have to copy the entire config structure. Flat replacement would silently reset all unspecified fields to `None`.
-* *Tradeoff*: More `Merge` derives and a small helper function in `config.rs`. Worth it for the user experience.
+* *Tradeoff*: Each `impl_merge!` call lists its struct's fields by hand, so a new field needs adding there too. A hand-written trait replaced the `merge` crate, whose derive macro depends on the unmaintained `proc-macro-error2` (RUSTSEC-2026-0173).
 
 === Single source of truth for defaults
 
@@ -290,13 +290,13 @@ None. All functionality is local to the user's machine.
 Keep in mind:
 
 * `Config::default()` is the single source of truth for all default threshold values. Do not add threshold constants elsewhere.
-* `merge_option_deep` in `config.rs` is intentional — do not replace it with `merge::option::overwrite_none` at the `Config` level or partial user configs will break.
+* The `Option<T>` impl of `Merge` in `config.rs` recurses on purpose. Replacing it with a flat "fill if `None`" rule breaks partial user configs.
 * The `check_and_notify` functions call `.unwrap()` on config fields without fallbacks. This is safe because they receive a fully-merged config from `Config::load()`. Do not add fallback values here.
 
 === Extension points
 
 * *New monitor*: add a `src/<name>.rs` library, a `src/bin/<name>-monitor.rs` binary, a config struct pair in `src/config.rs`, systemd service and timer files in `systemd/user/`, and entries in `Cargo.toml`.
-* *New threshold level*: add the field to the relevant `*Threshold` struct in `config.rs` (with `Merge` strategy), add it to `Config::default()`, and update the notification logic in the monitor library.
+* *New threshold level*: add the field to the relevant `*Threshold` struct in `config.rs` and to its `impl_merge!` call, add it to `Config::default()`, and update the notification logic in the monitor library.
 * *New notification type*: add a variant to `NotificationType` and `App` in `src/common.rs` and handle it in `get_icon`, `get_urgency`, and `get_appname`.
 
 === Patterns to follow
